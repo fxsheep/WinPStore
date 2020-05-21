@@ -1,0 +1,87 @@
+;
+; WinPStore.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=Sample ; TODO: edit Class
+ClassGuid={78A1C341-4539-11d3-B88D-00C04FAD5171} ; TODO: edit ClassGuid
+Provider=%ManufacturerName%
+CatalogFile=WinPStore.cat
+DriverVer= ; TODO: set DriverVer in stampinf property pages
+
+[DestinationDirs]
+DefaultDestDir = 12
+WinPStore_Device_CoInstaller_CopyFiles = 11
+
+; ================= Class section =====================
+
+[ClassInstall32]
+Addreg=SampleClassReg
+
+[SampleClassReg]
+HKR,,,0,%ClassName%
+HKR,,Icon,,-5
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+WinPStore.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%WinPStore.DeviceDesc%=WinPStore_Device, Root\WinPStore
+
+[WinPStore_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+WinPStore.sys
+
+;-------------- Service installation
+[WinPStore_Device.NT.Services]
+AddService = WinPStore,%SPSVCINST_ASSOCSERVICE%, WinPStore_Service_Inst
+
+; -------------- WinPStore driver install sections
+[WinPStore_Service_Inst]
+DisplayName    = %WinPStore.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 0               ; SERVICE_BOOT_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\WinPStore.sys
+LoadOrderGroup = Base
+
+;
+;--- WinPStore_Device Coinstaller installation ------
+;
+
+[WinPStore_Device.NT.CoInstallers]
+AddReg=WinPStore_Device_CoInstaller_AddReg
+CopyFiles=WinPStore_Device_CoInstaller_CopyFiles
+
+[WinPStore_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[WinPStore_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[WinPStore_Device.NT.Wdf]
+KmdfService =  WinPStore, WinPStore_wdfsect
+[WinPStore_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="fxsheep"
+ClassName="Samples" ; TODO: edit ClassName
+DiskName = "WinPStore Installation Disk"
+WinPStore.DeviceDesc = "WinPStore Device"
+WinPStore.SVCDESC = "WinPStore Service"
