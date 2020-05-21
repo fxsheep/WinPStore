@@ -117,11 +117,10 @@ DriverEntry(
     PStoreEnabled = TRUE;
     PStoreMemorySize = 4096;
     PStorePhysicalAddress.HighPart = 0x0L;
-    PStorePhysicalAddress.LowPart = 0x90000000L;
+    PStorePhysicalAddress.LowPart = 0x02000000L;
     //PStoreVirtualAddress = ExAllocatePoolWithTag(NonPagedPool, PStoreMemorySize, 0);
 
-    KdPrint(("WinPStore: Driver 1530 init start!\n"));
-
+    KdPrint(("WinPStore: DriverEntry\n"));
 
     if (PStoreEnabled) {
         Mdl = MmAllocatePagesForMdl(PStorePhysicalAddress,
@@ -146,15 +145,18 @@ DriverEntry(
         if (PStoreVirtualAddress) {
             LogBuffer.Buffer = PStoreVirtualAddress;
             LogBuffer.Offset = 0;
+            KdPrint(("WinPStore: va=0x%x, pa=0x%x\n",PStoreVirtualAddress,PStorePhysicalAddress));
             status = DbgSetDebugPrintCallback(LogDebugPrint, TRUE);
-            KdPrint(("WinPStore:DbgSetDebugPrintCallback status: %d\n", status));
+            KdPrint(("WinPStore: DbgSetDebugPrintCallback status: %d\n", status));
+        }
+        if (!NT_SUCCESS(status)) {
+fail:
+            KdPrint(("WinPStore: Failed to register pstore driver\n"));
         }
     }
-
-    if (!NT_SUCCESS(status)) {
-fail:
-        KdPrint(("WinPStore: Failed to register pstore driver\n"));
+    else {
+        KdPrint(("WinPStore: pstore driver disabled\n"));
     }
-    
+
     return status;
 }
