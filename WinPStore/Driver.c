@@ -159,7 +159,7 @@ LogDebugPrint(
         LogBuffer.Offset = 0;
     }
 
-    KdPrint(("WinPStore: Copying memory: %x to %x\n",
+    KdPrint(("WinPStore: Copying memory: %lx to %lx\n",
         Ansi->Buffer,
         LogBuffer.Buffer + LogBuffer.Offset));
     RtlCopyMemory(LogBuffer.Buffer + LogBuffer.Offset, Ansi->Buffer, Ansi->Length);
@@ -197,10 +197,13 @@ DriverEntry(
 #endif
 
     if (PStoreEnabled) {
-        Mdl = MmAllocatePagesForMdl(PStorePhysicalAddress,
+        Mdl = MmAllocatePagesForMdlEx(PStorePhysicalAddress,
             PStorePhysicalAddress,
             RtlConvertUlongToLargeInteger(0),
-            PStoreMemorySize);
+            PStoreMemorySize,
+            MmNonCached,
+            MM_ALLOCATE_REQUIRE_CONTIGUOUS_CHUNKS
+        );
 
         if (!Mdl) {
             KdPrint(("WinPStore: Failed to allocate physical pages\n"));
@@ -219,7 +222,7 @@ DriverEntry(
         if (PStoreVirtualAddress) {
             LogBuffer.Buffer = PStoreVirtualAddress;
             LogBuffer.Offset = 0;
-            KdPrint(("WinPStore: va=0x%x, pa=0x%x\n",PStoreVirtualAddress,PStorePhysicalAddress));
+            KdPrint(("WinPStore: va=0x%lx, pa=0x%lx\n",PStoreVirtualAddress,PStorePhysicalAddress));
             status = DbgSetDebugPrintCallback(LogDebugPrint, TRUE);
             KdPrint(("WinPStore: DbgSetDebugPrintCallback status: %d\n", status));
         }
