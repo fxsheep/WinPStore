@@ -15,6 +15,7 @@ typedef VOID
     );
 
 BOOLEAN           PStoreEnabled = FALSE;
+UINT32            RegPStoreEnabled;
 PHYSICAL_ADDRESS  PStorePhysicalAddress = { 0L, 0L };
 PVOID             PStoreVirtualAddress;
 ULONG             PStoreMemorySize;
@@ -31,10 +32,72 @@ void MmMdlRoutine(
     PStoreVirtualAddress = MappedVa;
 }
 
-//RTL_QUERY_REGISTRY_TABLE ConfigTable[] =
-//{
+RTL_QUERY_REGISTRY_TABLE PStoreRegConfigTable[] =
+{
+    {
+        NULL,
+        RTL_QUERY_REGISTRY_DIRECT,
+        L"PStoreEnabled",
+        &RegPStoreEnabled,
+        REG_DWORD,
+        NULL,
+        sizeof(UINT32)
+    },
 
-//};
+    //FIXME use single QWORD instead
+#if 0
+    {
+        NULL,
+        RTL_QUERY_REGISTRY_DIRECT,
+        L"PStoreMemoryAddress",
+        &PStorePhysicalAddress.QuadPart,
+        REG_QWORD,
+        NULL,
+        sizeof(ULONG)
+    },
+#endif
+
+    {
+        NULL,
+        RTL_QUERY_REGISTRY_DIRECT,
+        L"PStoreMemoryAddrLow",
+        &PStorePhysicalAddress.LowPart,
+        REG_DWORD,
+        NULL,
+        sizeof(UINT32)
+    },
+ 
+    {
+        NULL,
+        RTL_QUERY_REGISTRY_DIRECT,
+        L"PStoreMemoryAddrHigh",
+        &PStorePhysicalAddress.HighPart,
+        REG_DWORD,
+        NULL,
+        sizeof(UINT32)
+    },
+    
+    {
+        NULL,
+        RTL_QUERY_REGISTRY_DIRECT,
+        L"PStoreMemorySize",
+        &PStoreMemorySize,
+        REG_DWORD,
+        NULL,
+        sizeof(UINT32)
+    },
+
+    //Terminator
+    {
+        NULL,
+        0,
+        NULL,
+        0,
+        REG_DWORD,
+        NULL,
+        0
+    }
+};
 
 BOOLEAN
 RegQueryPStoreConfigs(
@@ -42,21 +105,28 @@ RegQueryPStoreConfigs(
 )
 {
     NTSTATUS status = STATUS_NOT_FOUND;
-#if 0
     status = RtlQueryRegistryValues(RTL_REGISTRY_CONTROL,
         L"WinPStore",
-        ConfigTable,
+        PStoreRegConfigTable,
         NULL,
         NULL);
-#endif
 
     if (NT_SUCCESS(status) == FALSE)
     {
         return FALSE;
     }
 
-
-    PStoreEnabled = FALSE;
+    if (RegPStoreEnabled == 1)
+    {
+        KdPrint(("WinPStore: PStorePhysicalAddressHigh: %x\n", PStorePhysicalAddress.HighPart));
+        KdPrint(("WinPStore: PStorePhysicalAddressLow: %x\n", PStorePhysicalAddress.LowPart));
+        KdPrint(("WinPStore: PStoreMemorySize: %d\n", PStoreMemorySize));
+        if ( PStorePhysicalAddress.QuadPart == 0L || PStoreMemorySize == 0L)
+        {
+            return FALSE;
+        }
+        PStoreEnabled = TRUE;
+    }
 
     return TRUE;
 }
@@ -88,6 +158,7 @@ LogDebugPrint(
     {
         LogBuffer.Offset = 0;
     }
+
     KdPrint(("WinPStore: Copying memory: %x to %x\n",
         Ansi->Buffer,
         LogBuffer.Buffer + LogBuffer.Offset));
@@ -98,29 +169,32 @@ LogDebugPrint(
 
 NTSTATUS
 DriverEntry(
-    _In_ PDRIVER_OBJECT     DriverObject,
-    _In_ PUNICODE_STRING    RegistryPath
+    IN PDRIVER_OBJECT     DriverObject,
+    IN PUNICODE_STRING    RegistryPath
 )
 {
     UNREFERENCED_PARAMETER(DriverObject);
     UNREFERENCED_PARAMETER(RegistryPath);
-    NTSTATUS status = STATUS_NOT_FOUND;
+    NTSTATUS status = STATUS_SUCCESS;
     PMDL Mdl;
-#if 0
+
+    KdPrint(("WinPStore: DriverEntry\n"));
+
     if (RegQueryPStoreConfigs() == FALSE) {
         KdPrint(("WinPStore: Failed to lookup pstore configs in registry\n"));
         status = STATUS_NOT_FOUND;
     }
-#endif
 
+    KdPrint(("WinPStore: RegPStoreEnabled: %d\n", RegPStoreEnabled));
+    KdPrint(("WinPStore: PStoreEnabled: %d\n", PStoreEnabled));
     //Test
+#if 0
     PStoreEnabled = TRUE;
     PStoreMemorySize = 4096;
     PStorePhysicalAddress.HighPart = 0x0L;
     PStorePhysicalAddress.LowPart = 0x02000000L;
     //PStoreVirtualAddress = ExAllocatePoolWithTag(NonPagedPool, PStoreMemorySize, 0);
-
-    KdPrint(("WinPStore: DriverEntry\n"));
+#endif
 
     if (PStoreEnabled) {
         Mdl = MmAllocatePagesForMdl(PStorePhysicalAddress,
@@ -139,7 +213,7 @@ DriverEntry(
             NULL);
 
         if (!NT_SUCCESS(status)) {
-            KdPrint(("WinPStore: Failed to allocate physical pages\n"));
+            KdPrint(("WinPStore: Failed to map physical pages\n"));
         }
 
         if (PStoreVirtualAddress) {
@@ -159,4 +233,15 @@ fail:
     }
 
     return status;
+}
+
+VOID
+DriverUnload(
+    IN PDRIVER_OBJECT     DriverObject
+)
+{
+    UNREFERENCED_PARAMETER(DriverObject);
+    DbgSetDebugPrintCallback(LogDebugPrint, FALSE);
+    KdPrint(("WinPStore: pstore driver unloaded\n"));
+    return;
 }
